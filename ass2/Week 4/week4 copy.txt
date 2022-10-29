@@ -1,0 +1,133 @@
+# read names from file
+import pickle
+import pandas as pd
+import urllib.request
+import json
+import math 
+from itertools import islice
+
+# DC
+
+# 1. Load names/wiki links dictionary
+dc = pickle.load( open( "dc.pkl", "rb" ) )
+marvel = pickle.load( open( "marvel.pkl", "rb" ) )
+
+# 2. Extract name / wiki link
+
+def clearDataset(dataset):
+    
+    wiki_links_n = {}
+    
+    for i in range(len(dataset)):
+        single_link = dataset['WikiLink'].iloc[i]
+        single_name = dataset['CharacterName'].iloc[i]        
+        
+        if(isinstance(single_link, float)):
+            continue
+        wiki_links_n[single_name] = single_link.replace(" ", "_")
+    
+    return wiki_links_n
+
+#print(clearDataset(marvel))
+marvel_cleaned_data_dir = clearDataset(dc.head())
+
+# 3. create URL with given character_wiki_link
+# @returns NAME-> URL dict
+def createURLs(data_dir): 
+    
+    url_query_list = {}
+    
+    for name,wiki in data_dir.items():
+        
+        character_wiki_link = data_dir[name]
+        
+        baseurl = "https://en.wikipedia.org/w/api.php?"
+        action = "action=query"
+        title = "titles=" + character_wiki_link
+        content = "prop=revisions&prop=content"
+        only_links = "prop=links&pllimit=max"
+        dataformat ="format=json"
+        
+        query = "{}{}&{}&{}&{}&{}".format(baseurl, action, content, title,only_links, dataformat)
+        url_query_list[name] = query
+        
+    
+    return url_query_list
+
+url_query_directory = createURLs(marvel_cleaned_data_dir)
+#print(url_query_directory)
+
+# 4. Send request
+
+def sendWikiRequests(url_list):
+    response_wiki_dir = {}
+    #z = list(url_list.values())[1]
+    #name =  list(url_list.keys())[1]
+    
+    for name,url in url_list.items():
+        wikiresponse = urllib.request.urlopen(url)
+        wikidata = wikiresponse.read()
+        #print(wikidata)
+        wikitext = wikidata.decode('utf-8')
+        
+        if (wikitext.strip().startswith("<!DOCTYPE html>")):
+            continue
+        
+        wiki_json = json.loads(wikitext)
+        print(len(wiki_json))
+        response_wiki_dir[name] = wiki_json
+        
+    return response_wiki_dir
+
+wiki_json_responses = sendWikiRequests(url_query_directory)
+
+#print(list(wiki_json_responses.values())[0])
+#print(type(wiki_json_responses))
+
+print()
+#x = next(iter( wiki_json_responses.values() ))
+#print('xxxxxxxxxxxxxxxxxxxxx', x)
+
+
+
+# 5. extractLinks for each title,
+# @return array of names(links) to other pages
+def extractNodeNeighbors(directory):
+    
+    linkList = []
+    
+    for i in range(len(directory)):
+        ns = link_dir[i]['ns']
+        if(int(ns) != 0):
+            break
+        else:
+            title = link_dir[i]['title']
+            linkList.append(title)
+    
+    return linkList
+  # 6. DO preprocessing for each entry
+
+def wiki_json_preprocessing(directory):
+    
+    name_neighbors = {}
+    
+    for name,value_json in directory.items():
+        non_unique = value_json['query']['pages'].keys()
+        non_unique = next(iter(non_unique))
+        
+        link_dir = value_json['query']['pages'][non_unique]['links']
+        node_neighbors = extractNodeNeighbors(link_dir)
+        
+        name_neighbors[name] = node_neighbors
+        
+    return name_neighbors      
+
+name_neighbors = wiki_json_preprocessing(wiki_json_responses)
+print(name_neighbors)
+
+#print(' node_neighbors ', node_neighbors)
+
+#pickle.dump( xay, open( "dc/Cain_and_Abel_(comics).pkl", "wb" ) )
+#cain_abel = pickle.load( open( "dc/Cain_and_Abel_(comics).pkl", "rb" ) )
+
+#print(cain_abel)
