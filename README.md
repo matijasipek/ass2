@@ -4,3 +4,4 @@ This is the second assignemnt for Social Graphs and Interactions: construction a
 
 
 ![Alt text](readme_img.png?raw=true "Title")
+Visualization of the network (a little teaser)
